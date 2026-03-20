@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 41 44% 96%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 30 25% 91%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 32 25% 92%;
+    --muted-foreground: 215 16% 40%;
+    --accent: 185 48% 87%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 32 19% 84%;
+    --input: 32 19% 84%;
+    --ring: 221 83% 53%;
+    --radius: 1rem;
+    --chart-1: 221 83% 53%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 34 94% 58%;
+    --chart-4: 12 76% 61%;
+    --chart-5: 268 71% 65%;
+  }
+
+  .dark {
+    --background: 220 43% 8%;
+    --foreground: 42 33% 95%;
+    --card: 222 39% 11%;
+    --card-foreground: 42 33% 95%;
+    --popover: 222 39% 11%;
+    --popover-foreground: 42 33% 95%;
+    --primary: 199 89% 48%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 219 24% 17%;
+    --secondary-foreground: 42 33% 95%;
+    --muted: 219 24% 17%;
+    --muted-foreground: 217 10% 70%;
+    --accent: 171 64% 17%;
+    --accent-foreground: 42 33% 95%;
+    --destructive: 0 63% 49%;
+    --destructive-foreground: 42 33% 95%;
+    --border: 217 19% 22%;
+    --input: 217 19% 22%;
+    --ring: 199 89% 48%;
+    --chart-1: 199 89% 48%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 45 93% 47%;
+    --chart-4: 12 76% 61%;
+    --chart-5: 262 83% 68%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply min-h-screen bg-background text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), transparent 25%),
+      radial-gradient(circle at top right, rgba(59, 130, 246, 0.1), transparent 30%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), transparent 40%);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-3xl border border-white/40 bg-white/75 shadow-[0_24px_80px_-48px_rgba(15,23,42,0.65)] backdrop-blur dark:border-white/10 dark:bg-slate-950/60;
+  }
+
+  .app-grid {
+    background-size: 32px 32px;
+    background-image: theme("backgroundImage.grid");
+  }
+}
