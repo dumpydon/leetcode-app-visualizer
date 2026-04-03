@@ -10,27 +10,34 @@ import {
 } from "@/lib/services/leetcode";
 import { fetchZerotracRatings } from "@/lib/services/zerotrac";
 import { getPrimaryUser } from "@/lib/services/users";
-import { chunk, median, normalizeTitle, titleToUrl, unixToIso } from "@/lib/utils";
+import {
+  chunk,
+  normalizeTitle,
+  percentile,
+  titleToUrl,
+  unixSecondsToUtcDateKey,
+  unixToIso,
+  utcDateKeyToDayIndex,
+} from "@/lib/utils";
 
 function computeLongestStreak(calendar: Record<string, number>) {
-  const dates = Object.entries(calendar)
+  const dayIndexes = Array.from(
+    new Set(
+      Object.entries(calendar)
     .filter(([, count]) => count > 0)
-    .map(([timestamp]) => new Date(Number(timestamp) * 1000))
-    .sort((left, right) => left.getTime() - right.getTime());
+        .map(([timestamp]) => utcDateKeyToDayIndex(unixSecondsToUtcDateKey(timestamp)))
+    )
+  ).sort((left, right) => left - right);
 
-  if (!dates.length) {
+  if (!dayIndexes.length) {
     return 0;
   }
 
   let longest = 1;
   let current = 1;
 
-  for (let index = 1; index < dates.length; index += 1) {
-    const previous = dates[index - 1];
-    const currentDate = dates[index];
-    const delta = Math.round(
-      (currentDate.getTime() - previous.getTime()) / (1000 * 60 * 60 * 24)
-    );
+  for (let index = 1; index < dayIndexes.length; index += 1) {
+    const delta = dayIndexes[index] - dayIndexes[index - 1];
 
     if (delta === 1) {
       current += 1;
@@ -164,7 +171,7 @@ async function updateDerivedUserMetrics(userId: string) {
   await prisma.user.update({
     where: { id: userId },
     data: {
-      estimatedRating: median(ratings),
+      estimatedRating: percentile(ratings, 75),
       readinessScore,
       syncMessage: `Exact solved-set sync unlocked across ${solvedProblems.length} problems.`,
       lastSyncStatus: "success",
@@ -429,8 +436,9 @@ export async function syncUser(userId: string) {
       data: exactSubmissionRows,
     });
 
-    await updateDerivedUserMetrics(userId);
   }
+
+  await updateDerivedUserMetrics(userId);
 
   const refreshedUser = await prisma.user.findUnique({
     where: { id: userId },

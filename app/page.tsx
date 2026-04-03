@@ -1,32 +1,24 @@
 import Link from "next/link";
 import {
   Flame,
-  Gauge,
   Gem,
   ListChecks,
   UserRound,
 } from "lucide-react";
 
 import { DifficultyMixChart } from "@/components/dashboard/difficulty-mix-chart";
+import { DailySolvesTracker } from "@/components/dashboard/daily-solves-tracker";
 import { SolveHeatmap } from "@/components/dashboard/heatmap";
 import { ReadinessMeter } from "@/components/dashboard/readiness-meter";
 import { RatingDistributionChart } from "@/components/dashboard/rating-distribution-chart";
+import { SkillRatingCard } from "@/components/dashboard/skill-rating-card";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { SyncButton } from "@/components/dashboard/sync-button";
-import { TopicBreakdownChart } from "@/components/dashboard/topic-breakdown-chart";
-import { WeeklyProgressChart } from "@/components/dashboard/weekly-progress-chart";
+import { EntrantHubRatingProgress } from "@/components/dashboard/entranthub-rating-progress";
 import { OnboardingForm } from "@/components/forms/onboarding-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { getDashboardStats } from "@/lib/services/analytics-service";
 import { formatDate } from "@/lib/utils";
 
@@ -56,11 +48,11 @@ export default async function HomePage() {
     );
   }
 
-  const estimatedRatingHint = stats.user.hasExactSolvedData
+  const skillRatingHint = stats.user.hasExactSolvedData
     ? stats.user.estimatedRatingSampleSize > 0
-      ? `Recomputed on sync from ${stats.user.estimatedRatingSampleSize} Zerotrac-rated exact solves. Current middle ratings: ${stats.user.estimatedRatingLeftMidpoint ?? "N/A"} and ${stats.user.estimatedRatingRightMidpoint ?? "N/A"}.`
+      ? `Recomputed on sync from ${stats.user.estimatedRatingSampleSize} Zerotrac-rated exact solves. Uses the 75th percentile of your solved-problem ratings.`
       : "Recomputed on sync, but none of your exact solved problems currently have Zerotrac ratings."
-    : "Median Zerotrac rating of solved problems.";
+    : "75th percentile of Zerotrac ratings from your solved problems.";
   const readinessBands = stats.ratingDistribution.filter((row) => {
     if (row.band === "Unavailable" || row.band.endsWith("+")) {
       return false;
@@ -69,6 +61,33 @@ export default async function HomePage() {
     const [min, max] = row.band.split("-").map(Number);
     return Number.isFinite(min) && Number.isFinite(max) && min >= 1400 && max <= 1800;
   });
+  const solvedCompletion = stats.totalProblems
+    ? ((stats.user.totalSolved / stats.totalProblems) * 100).toFixed(2)
+    : "0.00";
+  const solvedBreakdownHint = stats.user.hasExactSolvedData ? (
+    <div className="space-y-1">
+      <div>
+        {stats.user.totalSolved} of {stats.totalProblems} problems solved
+      </div>
+      <div>
+        {stats.user.exactRatedSolvedCount} Zerotrac-rated exact solves
+      </div>
+      <div>
+        {stats.user.exactUnratedSolvedCount} unrated exact solves
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-1">
+      <div>
+        {stats.user.totalSolved} of {stats.totalProblems} problems solved
+      </div>
+      <div>Exact rated/unrated breakdown is unavailable in public mode</div>
+    </div>
+  );
+  const dailySolvesWithProblems = stats.dailySolveSummary.slice().reverse().map((item) => ({
+    ...item,
+    problems: stats.heatmap.find((day) => day.date === item.date)?.problems ?? [],
+  }));
   return (
     <AppShell activePath="/">
       <section className="glass-card overflow-hidden p-6 lg:p-8">
@@ -110,11 +129,23 @@ export default async function HomePage() {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label="Total solved"
-          value={stats.user.totalSolved.toString()}
-          hint={`${stats.user.totalSolved} solved out of ${stats.totalProblems} total LeetCode problems.`}
+          value={
+            <div className="flex items-baseline gap-3">
+              <span className="text-3xl font-semibold tracking-tight">
+                {stats.user.totalSolved}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {solvedCompletion}% solved
+              </span>
+            </div>
+          }
+          hint={solvedBreakdownHint}
           icon={ListChecks}
         />
-        <StatCard label="Estimated rating" value={stats.user.estimatedRating ? stats.user.estimatedRating.toString() : "N/A"} hint={estimatedRatingHint} icon={Gauge} />
+        <SkillRatingCard
+          value={stats.user.estimatedRating ? stats.user.estimatedRating.toString() : "N/A"}
+          hint={skillRatingHint}
+        />
         <StatCard label="Current streak" value={`${stats.user.streakCurrent}d`} hint={`Longest streak ${stats.user.streakLongest}d`} icon={Flame} />
         <StatCard label="Solved 1800+ rating" value={stats.user.hardSolvedCount.toString()} hint="Solved problems with Zerotrac rating 1800 or higher." icon={Gem} />
       </section>
@@ -123,37 +154,7 @@ export default async function HomePage() {
         <RatingDistributionChart data={stats.ratingDistribution} exact={stats.user.hasExactSolvedData} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Solved vs Remaining</CardTitle>
-            <CardDescription>Coverage by rating band.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Rating Range</TableHead>
-                  <TableHead>Total Problems</TableHead>
-                  <TableHead>Solved</TableHead>
-                  <TableHead>Remaining</TableHead>
-                  <TableHead>Coverage %</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stats.ratingDistribution.map((row) => (
-                  <TableRow key={row.band}>
-                    <TableCell>{row.band}</TableCell>
-                    <TableCell>{row.total}</TableCell>
-                    <TableCell>{row.solved}</TableCell>
-                    <TableCell>{row.remaining}</TableCell>
-                    <TableCell>{row.coverage}%</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <section>
         <ReadinessMeter
           score={stats.user.readinessScore}
           bands={readinessBands}
@@ -162,97 +163,55 @@ export default async function HomePage() {
         />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Weekly Practice Report</CardTitle>
-            <CardDescription>Rolling seven-day summary.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Solved</div>
-                <div className="mt-2 text-2xl font-semibold">{stats.weeklyReport.solved}</div>
-              </div>
-              <div className="rounded-2xl border p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Avg rating</div>
-                <div className="mt-2 text-2xl font-semibold">{stats.weeklyReport.averageRating ?? "N/A"}</div>
-              </div>
-              <div className="rounded-2xl border p-4">
-                <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Readiness</div>
-                <div className="mt-2 text-2xl font-semibold">{stats.user.readinessScore ?? 0}%</div>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {stats.weeklyReport.topicsCovered.map((topic) => (
-                <Badge key={topic} variant="secondary">
-                  {topic}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-        <TopicBreakdownChart data={stats.topicBreakdown} />
-        <DifficultyMixChart data={stats.difficultyMix} totalSolved={stats.user.totalSolved} totalProblems={stats.totalProblems} />
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <WeeklyProgressChart data={stats.weeklyAverageRating} />
-        <Card>
-          <CardHeader>
-            <CardTitle>Daily Solves Tracker</CardTitle>
-            <CardDescription>E: easy, M: medium, H: hard.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {stats.dailySolveSummary.slice().reverse().map((item) => (
-              <div key={item.date} className="flex items-center justify-between rounded-2xl border px-4 py-3">
-                <div>
-                  <div className="font-medium">{formatDate(item.date)}</div>
-                  <div className="text-sm text-muted-foreground">
-                    E:{item.easy} M:{item.medium} H:{item.hard}
-                  </div>
-                </div>
-                <Badge variant="outline">{item.total} solved</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
-
       <SolveHeatmap data={stats.heatmap} />
 
-      <section className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Practice Recommendations</CardTitle>
-            <CardDescription>Ten questions near your current skill target.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-2">
-            {stats.recommendations.map((item) => (
-              <div key={item.slug} className="rounded-2xl border p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-semibold">{item.title}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {item.difficulty} · {item.rating ?? "Unrated"}
-                    </div>
-                  </div>
-                  <Badge variant="outline">{item.rating ?? "?"}</Badge>
+      <section className="grid gap-6 xl:grid-cols-2">
+        <div className="grid gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Weekly Practice Report</CardTitle>
+              <CardDescription>Rolling seven-day summary.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Solved</div>
+                  <div className="mt-2 text-2xl font-semibold">{stats.weeklyReport.solved}</div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {item.topics.slice(0, 3).map((topic) => (
-                    <Badge key={topic} variant="secondary">
-                      {topic}
-                    </Badge>
-                  ))}
+                <div className="rounded-2xl border p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Avg rating</div>
+                  <div className="mt-2 text-2xl font-semibold">{stats.weeklyReport.averageRating ?? "N/A"}</div>
+                </div>
+                <div className="rounded-2xl border p-4">
+                  <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">Readiness</div>
+                  <div className="mt-2 text-2xl font-semibold">{stats.user.readinessScore ?? 0}%</div>
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+              <div className="flex flex-wrap gap-2">
+                {stats.weeklyReport.topicsCovered.map((topic) => (
+                  <Badge key={topic} variant="secondary">
+                    {topic}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <DifficultyMixChart
+            data={stats.difficultyMix}
+            totalSolved={stats.user.totalSolved}
+            totalProblems={stats.totalProblems}
+          />
+        </div>
+
+        <DailySolvesTracker items={dailySolvesWithProblems} />
+
+        <div className="xl:col-span-2">
+          <EntrantHubRatingProgress username={stats.user.username} />
+        </div>
+      </section>
+
+      <section>
         <Card>
           <CardHeader>
             <CardTitle>Leaderboard Mode</CardTitle>
@@ -268,7 +227,7 @@ export default async function HomePage() {
                   <div>
                     <div className="font-medium">{entry.username}</div>
                     <div className="text-sm text-muted-foreground">
-                      {entry.totalSolved} solved · est. {entry.estimatedRating ?? "N/A"}
+                      {entry.totalSolved} solved · skill {entry.estimatedRating ?? "N/A"}
                     </div>
                   </div>
                 </div>

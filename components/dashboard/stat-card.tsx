@@ -1,4 +1,5 @@
 import { LucideIcon } from "lucide-react";
+import { ReactNode } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -9,8 +10,8 @@ export function StatCard({
   icon: Icon,
 }: {
   label: string;
-  value: string;
-  hint?: string;
+  value: ReactNode;
+  hint?: ReactNode;
   icon: LucideIcon;
 }) {
   return (
@@ -22,8 +23,8 @@ export function StatCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-semibold tracking-tight">{value}</div>
-        {hint ? <p className="mt-2 text-sm text-muted-foreground">{hint}</p> : null}
+        <div>{value}</div>
+        {hint ? <div className="mt-2 text-sm text-muted-foreground">{hint}</div> : null}
       </CardContent>
     </Card>
   );

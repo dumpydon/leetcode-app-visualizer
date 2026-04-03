@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bar,
   BarChart,
@@ -25,8 +26,84 @@ const colors = [
   "#2563eb",
 ];
 const TOTAL_BACKGROUND_SCALE = 0.5;
-const VISUAL_BAR_SCALE = 2;
+const TOTAL_BAR_VISUAL_SCALE = 2;
+const SOLVED_BAR_VISUAL_SCALE = 1.5;
 const CHART_Y_MAX = 300;
+
+function getActivePayload(
+  state: unknown
+): {
+  band: string;
+} | null {
+  const candidate = state as {
+    activePayload?: Array<{
+      payload?: {
+        band?: string;
+      };
+    }>;
+  } | null;
+
+  const payload = candidate?.activePayload?.[0]?.payload;
+
+  if (!payload?.band) {
+    return null;
+  }
+
+  return { band: payload.band };
+}
+
+function RatingTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      band: string;
+      solved: number;
+      total: number;
+    };
+  }>;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  const data = payload[0].payload;
+  const coverage = data.total > 0 ? ((data.solved / data.total) * 100).toFixed(2) : "0.00";
+
+  return (
+    <div className="min-w-[180px] space-y-3 rounded-2xl border bg-card/95 p-4 text-sm shadow-2xl backdrop-blur">
+      <div>
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Rating Range
+        </div>
+        <div className="mt-1 text-base font-semibold">{data.band}</div>
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Solved
+        </div>
+        <div className="mt-1 text-lg font-semibold">{data.solved}</div>
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Total Problems
+        </div>
+        <div className="mt-1 text-lg font-semibold">{data.total}</div>
+      </div>
+
+      <div>
+        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+          Coverage
+        </div>
+        <div className="mt-1 text-lg font-semibold">{coverage}%</div>
+      </div>
+    </div>
+  );
+}
 
 function RatingBandBar(props: {
   x?: number;
@@ -39,6 +116,8 @@ function RatingBandBar(props: {
     total: number;
     chartTotal: number;
     fillColor: string;
+    isActive: boolean;
+    isDimmed: boolean;
   };
 }) {
   const { x = 0, y = 0, width = 0, height = 0, payload } = props;
@@ -50,15 +129,23 @@ function RatingBandBar(props: {
   const solvedHeight =
     payload.total > 0
       ? Math.min(
-          Math.max((payload.solved / payload.total) * height * VISUAL_BAR_SCALE, payload.solved > 0 ? 4 : 0),
+          Math.max(
+            (payload.solved / payload.total) * height * SOLVED_BAR_VISUAL_SCALE,
+            payload.solved > 0 ? 4 : 0
+          ),
           height
         )
       : 0;
-  const totalBackgroundHeight = Math.min(height * TOTAL_BACKGROUND_SCALE * VISUAL_BAR_SCALE, height);
+  const totalBackgroundHeight = Math.min(
+    height * TOTAL_BACKGROUND_SCALE * TOTAL_BAR_VISUAL_SCALE,
+    height
+  );
   const totalBackgroundY = y + height - totalBackgroundHeight;
   const solvedWidth = Math.max(width * 0.68, 8);
   const solvedX = x + (width - solvedWidth) / 2;
   const solvedY = y + height - solvedHeight;
+  const totalOpacity = payload.isDimmed ? 0.18 : payload.isActive ? 0.52 : 0.28;
+  const solvedOpacity = payload.isDimmed ? 0.4 : 1;
 
   return (
     <g>
@@ -68,7 +155,7 @@ function RatingBandBar(props: {
         width={width}
         height={totalBackgroundHeight}
         radius={[10, 10, 0, 0]}
-        fill="rgba(226, 232, 240, 0.28)"
+        fill={`rgba(226, 232, 240, ${totalOpacity})`}
       />
       {solvedHeight > 0 ? (
         <Rectangle
@@ -78,6 +165,7 @@ function RatingBandBar(props: {
           height={solvedHeight}
           radius={[10, 10, 0, 0]}
           fill={payload.fillColor}
+          fillOpacity={solvedOpacity}
         />
       ) : null}
     </g>
@@ -97,6 +185,9 @@ export function RatingDistributionChart({
   }>;
   exact: boolean;
 }) {
+  const router = useRouter();
+  const [hoveredBand, setHoveredBand] = useState<string | null>(null);
+
   const chartData = data.map((item, index) => {
     const chartTotal = Math.max(
       item.band === "Unavailable"
@@ -109,8 +200,11 @@ export function RatingDistributionChart({
       ...item,
       chartTotal,
       fillColor: colors[index % colors.length],
+      isActive: hoveredBand === item.band,
+      isDimmed: hoveredBand !== null && hoveredBand !== item.band,
     };
   });
+
   return (
     <Card>
       <CardHeader>
@@ -123,7 +217,23 @@ export function RatingDistributionChart({
         <ChartShell heightClassName="h-[460px]">
           <div className="h-[460px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} margin={{ top: 10, right: 8, left: 0, bottom: 36 }} barCategoryGap={12}>
+              <BarChart
+                data={chartData}
+                margin={{ top: 10, right: 8, left: 0, bottom: 36 }}
+                barCategoryGap={12}
+                onMouseLeave={() => setHoveredBand(null)}
+                onMouseMove={(state) => {
+                  const active = getActivePayload(state);
+                  setHoveredBand(active?.band ?? null);
+                }}
+                onClick={(state) => {
+                  const active = getActivePayload(state);
+
+                  if (active?.band) {
+                    router.push(`/problems?band=${encodeURIComponent(active.band)}`);
+                  }
+                }}
+              >
                 <CartesianGrid vertical={false} strokeDasharray="3 3" />
                 <XAxis
                   dataKey="band"
@@ -136,32 +246,12 @@ export function RatingDistributionChart({
                   fontSize={12}
                 />
                 <YAxis tickLine={false} axisLine={false} domain={[0, CHART_Y_MAX]} width={44} />
-                <Tooltip
-                  formatter={(_, __, item) => {
-                    const payload = item.payload as (typeof chartData)[number];
-                    return [`${payload.solved} solved / ${payload.total} total`, payload.band];
-                  }}
-                />
+                <Tooltip cursor={false} content={<RatingTooltip />} />
                 <Bar dataKey="chartTotal" shape={<RatingBandBar />} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </ChartShell>
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          {data.map((item) => (
-            <Link
-              key={item.band}
-              href={`/problems?band=${encodeURIComponent(item.band)}`}
-              className="rounded-2xl border p-4 transition hover:bg-muted/50"
-            >
-              <div className="text-xs uppercase tracking-[0.25em] text-muted-foreground">{item.band}</div>
-              <div className="mt-2 text-lg font-semibold">
-                {item.solved} / {item.total}
-              </div>
-              <div className="text-sm text-muted-foreground">{item.coverage}% coverage</div>
-            </Link>
-          ))}
-        </div>
       </CardContent>
     </Card>
   );

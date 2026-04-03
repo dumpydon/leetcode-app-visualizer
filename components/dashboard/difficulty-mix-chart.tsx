@@ -51,6 +51,10 @@ export function DifficultyMixChart({
   totalSolved: number;
   totalProblems: number;
 }) {
+  const solvedCompletion = totalProblems
+    ? ((totalSolved / totalProblems) * 100).toFixed(2)
+    : "0.00";
+
   const chartData = data.map((item) => ({
     ...item,
     percent: totalSolved ? (item.value / totalSolved) * 100 : 0,
@@ -126,6 +130,7 @@ export function DifficultyMixChart({
           <div className="mt-2 text-3xl font-semibold">
             {totalSolved} / {totalProblems}
           </div>
+          <div className="mt-1 text-sm text-muted-foreground">{solvedCompletion}% solved</div>
         </div>
       </CardContent>
     </Card>

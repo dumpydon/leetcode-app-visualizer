@@ -2,6 +2,19 @@ import { clsx, type ClassValue } from "clsx";
 import { format, fromUnixTime, isSameDay, parseISO } from "date-fns";
 import { twMerge } from "tailwind-merge";
 
+const utcMonthDayFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+const utcLongDateFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -29,19 +42,15 @@ export function parseJson<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
-export function median(values: number[]) {
+export function percentile(values: number[], p: number) {
   if (!values.length) {
     return null;
   }
 
   const sorted = [...values].sort((a, b) => a - b);
-  const middle = Math.floor(sorted.length / 2);
-
-  if (sorted.length % 2 === 0) {
-    return Math.round((sorted[middle - 1] + sorted[middle]) / 2);
-  }
-
-  return sorted[middle];
+  const clampedPercentile = Math.min(100, Math.max(0, p));
+  const index = Math.floor((clampedPercentile / 100) * (sorted.length - 1));
+  return sorted[index];
 }
 
 export function clamp(value: number, min: number, max: number) {
@@ -58,6 +67,38 @@ export function percentage(value: number, total: number) {
 
 export function unixToIso(value: number | string) {
   return fromUnixTime(Number(value)).toISOString();
+}
+
+export function toUtcDateKey(value: string | number | Date) {
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+export function unixSecondsToUtcDateKey(value: string | number) {
+  return new Date(Number(value) * 1000).toISOString().slice(0, 10);
+}
+
+export function utcDateKeyToDayIndex(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+export function utcDayIndexToDateKey(dayIndex: number) {
+  return new Date(dayIndex * 86_400_000).toISOString().slice(0, 10);
+}
+
+export function startOfUtcWeekDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  const weekday = utcDate.getUTCDay();
+  return utcDayIndexToDateKey(utcDateKeyToDayIndex(dateKey) - weekday);
+}
+
+export function formatUtcDateKey(dateKey: string, mode: "short" | "long" = "long") {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const utcDate = new Date(Date.UTC(year, month - 1, day));
+  return mode === "short"
+    ? utcMonthDayFormatter.format(utcDate)
+    : utcLongDateFormatter.format(utcDate);
 }
 
 export function formatDate(value: string | Date, dateFormat = "MMM d, yyyy") {

@@ -6,6 +6,7 @@ export type ProblemBand = {
 };
 
 export type ProblemCardData = {
+  frontendId?: string | null;
   slug: string;
   title: string;
   difficulty: string;
@@ -49,6 +50,9 @@ export type DashboardStats = {
     totalSolved: number;
     estimatedRating: number | null;
     estimatedRatingSampleSize: number;
+    exactSolvedCount: number;
+    exactRatedSolvedCount: number;
+    exactUnratedSolvedCount: number;
     estimatedRatingLeftMidpoint: number | null;
     estimatedRatingRightMidpoint: number | null;
     contestRating: number | null;
@@ -77,7 +81,6 @@ export type DashboardStats = {
     }
   >;
   topicBreakdown: Array<{ topic: string; solved: number }>;
-  weeklyAverageRating: Array<{ week: string; averageRating: number }>;
   difficultyMix: Array<{ difficulty: string; value: number; total: number }>;
   heatmap: HeatmapDay[];
   dailySolveSummary: Array<{

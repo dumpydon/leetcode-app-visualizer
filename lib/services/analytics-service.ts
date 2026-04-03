@@ -1,14 +1,20 @@
-import { startOfWeek, subDays, format, isAfter } from "date-fns";
-
 import { RATING_BANDS, TOPIC_SHORTLIST } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { fetchQuestionCatalogSummary } from "@/lib/services/leetcode";
 import { getAllUsers, getPrimaryUser } from "@/lib/services/users";
 import { DashboardStats, HeatmapDay, ProblemCardData, ReadinessPushCard } from "@/lib/types";
-import { parseJson, percentage, titleToUrl } from "@/lib/utils";
+import {
+  parseJson,
+  percentage,
+  titleToUrl,
+  toUtcDateKey,
+  unixSecondsToUtcDateKey,
+  utcDateKeyToDayIndex,
+} from "@/lib/utils";
 
 function problemToCard(
   problem: {
+    frontendId?: string | null;
     slug: string;
     title: string;
     difficulty: string;
@@ -21,6 +27,7 @@ function problemToCard(
   lastSolvedAt?: string | null
 ) {
   return {
+    frontendId: problem.frontendId ?? null,
     slug: problem.slug,
     title: problem.title,
     difficulty: problem.difficulty,
@@ -94,6 +101,7 @@ function buildReadinessPushRecommendations({
   rng,
 }: {
   problems: Array<{
+    frontendId?: string | null;
     slug: string;
     title: string;
     difficulty: string;
@@ -109,20 +117,20 @@ function buildReadinessPushRecommendations({
 }) {
   const lanes = [
     {
-      label: `${baseRating + 50}-${baseRating + 100}`,
-      min: baseRating + 50,
-      max: baseRating + 100,
+      label: `${baseRating}-${baseRating + 50}`,
+      min: baseRating,
+      max: baseRating + 50,
       count: 2,
     },
     {
-      label: `${baseRating + 150}-${baseRating + 200}`,
-      min: baseRating + 150,
+      label: `${baseRating + 100}-${baseRating + 200}`,
+      min: baseRating + 100,
       max: baseRating + 200,
       count: 2,
     },
     {
-      label: `${baseRating + 100}-${baseRating + 500}`,
-      min: baseRating + 100,
+      label: `${baseRating}-${baseRating + 500}`,
+      min: baseRating,
       max: baseRating + 500,
       count: 2,
     },
@@ -246,29 +254,13 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
     .map((item) => item.problem.rating)
     .filter((value): value is number => typeof value === "number")
     .sort((left, right) => left - right);
+  const exactSolvedCount = solvedProblems.filter((item) => item.confidence === "EXACT").length;
   const ratedSolvedCount = ratedSolvedValues.length;
+  const unratedSolvedCount = Math.max(exactSolvedCount - ratedSolvedCount, 0);
   const estimatedRatingLeftMidpoint =
     ratedSolvedCount > 0 ? ratedSolvedValues[Math.floor((ratedSolvedCount - 1) / 2)] : null;
   const estimatedRatingRightMidpoint =
     ratedSolvedCount > 0 ? ratedSolvedValues[Math.floor(ratedSolvedCount / 2)] : null;
-
-  const weeklyAverageRating = Array.from(
-    submissions.reduce((accumulator, submission) => {
-      if (!submission.problem.rating) {
-        return accumulator;
-      }
-
-      const weekKey = format(startOfWeek(submission.submittedAt), "MMM d");
-      const current = accumulator.get(weekKey) ?? { total: 0, count: 0 };
-      current.total += submission.problem.rating;
-      current.count += 1;
-      accumulator.set(weekKey, current);
-      return accumulator;
-    }, new Map<string, { total: number; count: number }>())
-  ).map(([week, value]) => ({
-    week,
-    averageRating: Math.round(value.total / value.count),
-  }));
 
   const recentAccepted = parseJson<
     Array<{ title: string; slug: string; timestamp: string }>
@@ -276,7 +268,7 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
   const submissionCalendar = parseJson<Record<string, number>>(user.submissionCalendar, {});
 
   const exactHeatmap = submissions.reduce((accumulator, submission) => {
-    const key = format(submission.submittedAt, "yyyy-MM-dd");
+    const key = toUtcDateKey(submission.submittedAt);
     const item = accumulator.get(key) ?? {
       date: key,
       total: 0,
@@ -310,7 +302,7 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
   }, new Map<string, HeatmapDay>());
 
   for (const [timestamp, total] of Object.entries(submissionCalendar)) {
-    const date = format(new Date(Number(timestamp) * 1000), "yyyy-MM-dd");
+    const date = unixSecondsToUtcDateKey(timestamp);
 
     if (!exactHeatmap.has(date)) {
       exactHeatmap.set(date, {
@@ -320,7 +312,7 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
         medium: 0,
         hard: 0,
         problems: recentAccepted
-          .filter((item) => format(new Date(Number(item.timestamp) * 1000), "yyyy-MM-dd") === date)
+          .filter((item) => unixSecondsToUtcDateKey(item.timestamp) === date)
           .map((item) => ({
             frontendId: problemMap.get(item.slug)?.frontendId ?? null,
             title: item.title,
@@ -336,7 +328,7 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
     left.date.localeCompare(right.date)
   );
 
-  const dailySolveSummary = heatmap.slice(-14).map((item) => ({
+  const dailySolveSummary = heatmap.slice(-10).map((item) => ({
     date: item.date,
     easy: item.easy,
     medium: item.medium,
@@ -358,9 +350,14 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
       problemToCard(problem, false, bookmarkMap.get(problem.slug) ?? null)
     );
 
-  const sevenDaysAgo = subDays(new Date(), 7);
-  const recentSubmissions = submissions.filter((submission) =>
-    isAfter(submission.submittedAt, sevenDaysAgo)
+  const todayUtcKey = toUtcDateKey(new Date());
+  const todayUtcIndex = utcDateKeyToDayIndex(todayUtcKey);
+  const sevenDayWindowStart = todayUtcIndex - 6;
+  const recentSubmissions = submissions.filter(
+    (submission) => utcDateKeyToDayIndex(toUtcDateKey(submission.submittedAt)) >= sevenDayWindowStart
+  );
+  const recentRatedSubmissions = recentSubmissions.filter(
+    (submission) => typeof submission.problem.rating === "number"
   );
   const weeklyReportTopics = Array.from(
     new Set(
@@ -410,6 +407,9 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
       totalSolved: user.totalSolved,
       estimatedRating: user.estimatedRating,
       estimatedRatingSampleSize: ratedSolvedCount,
+      exactSolvedCount,
+      exactRatedSolvedCount: ratedSolvedCount,
+      exactUnratedSolvedCount: unratedSolvedCount,
       estimatedRatingLeftMidpoint,
       estimatedRatingRightMidpoint,
       contestRating: user.contestRating,
@@ -428,7 +428,6 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
       topicBreakdown.length > 0
         ? topicBreakdown
         : TOPIC_SHORTLIST.map((topic) => ({ topic, solved: 0 })),
-    weeklyAverageRating,
     difficultyMix,
     heatmap,
     dailySolveSummary,
@@ -443,12 +442,10 @@ export async function getDashboardStats(userId?: string): Promise<DashboardStats
     })),
     weeklyReport: {
       solved: recentSubmissions.length,
-      averageRating: recentSubmissions.length
+      averageRating: recentRatedSubmissions.length
         ? Math.round(
-            recentSubmissions.reduce(
-              (total, item) => total + (item.problem.rating ?? 0),
-              0
-            ) / recentSubmissions.length
+            recentRatedSubmissions.reduce((total, item) => total + (item.problem.rating ?? 0), 0) /
+              recentRatedSubmissions.length
           )
         : null,
       topicsCovered: weeklyReportTopics,
