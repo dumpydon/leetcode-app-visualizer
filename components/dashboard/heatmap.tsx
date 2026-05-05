@@ -11,7 +11,7 @@ import { clamp, formatUtcDateKey } from "@/lib/utils";
 const TILE_SIZE = 16;
 const TILE_GAP = 3;
 const GRID_ROWS = 7;
-const TOOLTIP_WIDTH = 180;
+const TOOLTIP_WIDTH = 220;
 const TOOLTIP_HEIGHT = 96;
 const PANEL_WIDTH = 530;
 const PANEL_MAX_HEIGHT = 630;
@@ -63,6 +63,30 @@ function tileColor(total: number) {
   if (total === 2) return "#006d32";
   if (total === 3) return "#26a641";
   return "#39d353";
+}
+
+function tooltipTheme(total: number) {
+  if (total <= 5) {
+    return {
+      borderColor: "rgba(239, 68, 68, 0.8)",
+      background: "rgba(25,10,10,0.55)",
+      boxShadow: "0 0 18px rgba(255,60,60,0.35)",
+    };
+  }
+
+  if (total <= 9) {
+    return {
+      borderColor: "rgba(168, 85, 247, 0.8)",
+      background: "rgba(20,10,30,0.75)",
+      boxShadow: "0 0 20px rgba(168,85,247,0.35)",
+    };
+  }
+
+  return {
+    borderColor: "rgba(52, 211, 153, 0.8)",
+    background: "rgba(10,25,15,0.95)",
+    boxShadow: "0 0 20px rgba(34,197,94,0.30)",
+  };
 }
 
 function difficultyMeta(difficulty: string | null) {
@@ -364,27 +388,38 @@ export function SolveHeatmap({ data }: { data: HeatmapDay[] }) {
 
                   {hovered ? (
                     <div
-                      className="pointer-events-none absolute z-20 rounded-lg border border-white/15 bg-slate-950/95 px-3 py-2 text-xs text-slate-100 shadow-xl transition-opacity duration-150"
+                      className="pointer-events-none absolute z-20 rounded-xl border px-3 py-2 text-xs text-slate-100 backdrop-blur-md transition-all duration-200"
                       style={{
                         width: TOOLTIP_WIDTH,
                         left: clamp(
-                          hovered.columnIndex * (TILE_SIZE + TILE_GAP) - TOOLTIP_WIDTH / 2,
+                          hovered.columnIndex * (TILE_SIZE + TILE_GAP) - TOOLTIP_WIDTH - 10,
                           0,
                           Math.max(0, gridWidth - TOOLTIP_WIDTH)
                         ),
                         top: clamp(
-                          hovered.rowIndex * (TILE_SIZE + TILE_GAP) - TOOLTIP_HEIGHT - 8,
+                          hovered.rowIndex * (TILE_SIZE + TILE_GAP) - TOOLTIP_HEIGHT / 2 + TILE_SIZE / 2,
                           0,
                           Math.max(0, gridHeight - TOOLTIP_HEIGHT)
                         ),
                         animation: "fadeTooltip 120ms ease-out",
+                        ...tooltipTheme(hovered.day.total),
                       }}
                     >
                       <div className="font-semibold">{formatUtcDateKey(hovered.day.dateKey)}</div>
-                      <div className="mt-1">{hovered.day.total} problems solved</div>
-                      <div>Easy: {hovered.day.easy}</div>
-                      <div>Medium: {hovered.day.medium}</div>
-                      <div>Hard: {hovered.day.hard}</div>
+                      <div className="mb-2 mt-1 whitespace-nowrap text-lg font-semibold text-gray-100">
+                        {hovered.day.total} problems solved
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] font-medium">
+                        <span style={{ color: "#00B8A3" }}>
+                          Easy: <span className="text-lg font-semibold">{hovered.day.easy}</span>
+                        </span>
+                        <span style={{ color: "#FFC01E" }}>
+                          Medium: <span className="text-lg font-semibold">{hovered.day.medium}</span>
+                        </span>
+                        <span style={{ color: "#FF375F" }}>
+                          Hard: <span className="text-lg font-semibold">{hovered.day.hard}</span>
+                        </span>
+                      </div>
                     </div>
                   ) : null}
                 </div>
