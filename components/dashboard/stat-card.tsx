@@ -23,7 +23,13 @@ export function StatCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div>{value}</div>
+        <div>
+          {typeof value === "string" || typeof value === "number" ? (
+            <div className="text-3xl font-semibold tracking-tight">{value}</div>
+          ) : (
+            value
+          )}
+        </div>
         {hint ? <div className="mt-2 text-sm text-muted-foreground">{hint}</div> : null}
       </CardContent>
     </Card>

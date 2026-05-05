@@ -18,6 +18,7 @@ import { EntrantHubRatingProgress } from "@/components/dashboard/entranthub-rati
 import { OnboardingForm } from "@/components/forms/onboarding-form";
 import { AppShell } from "@/components/layout/app-shell";
 import { Badge } from "@/components/ui/badge";
+import ClientOnly from "@/components/ui/client-only";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardStats } from "@/lib/services/analytics-service";
 import { formatDate } from "@/lib/utils";
@@ -70,10 +71,10 @@ export default async function HomePage() {
         {stats.user.totalSolved} of {stats.totalProblems} problems solved
       </div>
       <div>
-        {stats.user.exactRatedSolvedCount} Zerotrac-rated exact solves
+        {stats.user.exactRatedSolvedCount} solved with Zerotrac rating available
       </div>
       <div>
-        {stats.user.exactUnratedSolvedCount} unrated exact solves
+        {stats.user.exactUnratedSolvedCount} solved with Zerotrac rating not available
       </div>
     </div>
   ) : (
@@ -89,7 +90,8 @@ export default async function HomePage() {
     problems: stats.heatmap.find((day) => day.date === item.date)?.problems ?? [],
   }));
   return (
-    <AppShell activePath="/">
+    <ClientOnly>
+      <AppShell activePath="/">
       <section className="glass-card overflow-hidden p-6 lg:p-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -131,7 +133,7 @@ export default async function HomePage() {
           label="Total solved"
           value={
             <div className="flex items-baseline gap-3">
-              <span className="text-3xl font-semibold tracking-tight">
+              <span className="text-[2.6rem] font-semibold leading-none tracking-tight">
                 {stats.user.totalSolved}
               </span>
               <span className="text-sm text-muted-foreground">
@@ -237,6 +239,7 @@ export default async function HomePage() {
           </CardContent>
         </Card>
       </section>
-    </AppShell>
+      </AppShell>
+    </ClientOnly>
   );
 }

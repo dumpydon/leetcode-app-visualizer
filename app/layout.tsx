@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${sans.variable} ${mono.variable} font-sans`}>
+      <body suppressHydrationWarning className={`${sans.variable} ${mono.variable} font-sans`}>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
