@@ -10,8 +10,7 @@ A production-ready personal analytics dashboard for LeetCode practice, built wit
 - Recharts
 - React Query
 - Prisma
-- SQLite for local development
-- PostgreSQL for production
+- PostgreSQL (Supabase/Vercel compatible)
 
 ## What it does
 
@@ -46,17 +45,17 @@ npm install
 npm run dev
 ```
 
-That is enough for local development. The repo defaults to SQLite and bootstraps the local schema automatically into [`prisma/dev.db`](/Users/piyushagarwal/LEETCODE/leetcode%20app%20visualizer/prisma/dev.db).
+Before first run, ensure `DATABASE_URL` and `DIRECT_URL` are set to PostgreSQL values.
 
 ## Environment variables
 
 Use [`.env.example`](/Users/piyushagarwal/LEETCODE/leetcode%20app%20visualizer/.env.example) as the reference.
 
-Required for local defaults:
+Required:
 
 ```env
-DATABASE_PROVIDER=sqlite
-DATABASE_URL=file:./prisma/dev.db
+DATABASE_URL=postgresql://...:6543/postgres?pgbouncer=true&connection_limit=1
+DIRECT_URL=postgresql://...:5432/postgres
 ```
 
 Optional for richer analytics:
@@ -73,17 +72,17 @@ If those two values are set, the app can sync your exact solved set instead of r
 Set these environment variables in Vercel:
 
 ```env
-DATABASE_PROVIDER=postgresql
 DATABASE_URL=postgresql://...
+DIRECT_URL=postgresql://...
 LEETCODE_SESSION=
 LEETCODE_CSRF_TOKEN=
 ```
 
-Then deploy normally. The build script will:
+Then deploy normally. Ensure schema is applied with:
 
-1. select the PostgreSQL Prisma schema
-2. apply the current schema
-3. build the Next.js app
+```bash
+npx prisma db push
+```
 
 ## Data sources
 

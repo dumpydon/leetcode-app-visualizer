@@ -3,13 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "prisma:prepare": "DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} node prisma/select-schema.mjs",
-    "db:push": "DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/select-schema.mjs && DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/apply-schema.mjs",
-    "dev": "DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/select-schema.mjs && DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/apply-schema.mjs && DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} next dev",
-    "build": "DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/select-schema.mjs && DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/apply-schema.mjs && DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} next build",
-    "start": "DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} next start",
+    "db:push": "prisma db push",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
     "lint": "next lint",
-    "postinstall": "DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} node prisma/select-schema.mjs && DATABASE_PROVIDER=${DATABASE_PROVIDER:-sqlite} DATABASE_URL=${DATABASE_URL:-file:./prisma/dev.db} prisma generate"
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.16.1",

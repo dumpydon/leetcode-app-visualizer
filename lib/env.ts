@@ -1,6 +1,5 @@
 export const env = {
-  databaseProvider: process.env.DATABASE_PROVIDER ?? "sqlite",
-  databaseUrl: process.env.DATABASE_URL ?? "file:./prisma/dev.db",
+  databaseUrl: process.env.DATABASE_URL ?? "",
   appName: process.env.NEXT_PUBLIC_APP_NAME ?? "LeetCode Visualizer",
   zerotracDataUrl:
     process.env.ZEROTRAC_DATA_URL ??

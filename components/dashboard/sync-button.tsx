@@ -5,13 +5,15 @@ import { RefreshCcw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 
+const SYNC_TIMEOUT_MS = 240_000;
+
 export function SyncButton() {
   const mutation = useMutation({
     mutationFn: async () => {
       console.log("[sync-button] starting sync request");
       const response = await fetch("/api/sync", {
         method: "POST",
-        signal: AbortSignal.timeout(45_000),
+        signal: AbortSignal.timeout(SYNC_TIMEOUT_MS),
       });
 
       const payload = await response.json().catch(() => ({}));

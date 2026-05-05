@@ -200,7 +200,7 @@ export async function validateAuthenticatedSession(auth: AuthConfig) {
 
 export async function fetchQuestionCatalog() {
   const response = await fetch("https://leetcode.com/api/problems/all/", {
-    next: { revalidate: 60 * 60 * 12 },
+    cache: "no-store",
     signal: AbortSignal.timeout(20_000),
   });
 
@@ -238,7 +238,7 @@ export async function fetchQuestionCatalog() {
 
 export async function fetchQuestionCatalogSummary(): Promise<QuestionCatalogSummary> {
   const response = await fetch("https://leetcode.com/api/problems/all/", {
-    next: { revalidate: 60 * 60 * 12 },
+    cache: "no-store",
     signal: AbortSignal.timeout(20_000),
   });
 
