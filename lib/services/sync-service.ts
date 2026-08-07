@@ -88,25 +88,37 @@ async function ensureProblemCatalog() {
   const existing = await prisma.problem.count();
   const summary = await fetchQuestionCatalogSummary();
 
+  console.log(`[sync] Catalog in database: ${existing}`);
+  console.log(`[sync] LeetCode catalog: ${summary.total}`);
+
   if (existing >= summary.total) {
-    console.log("[sync] problem catalog already up to date, skipping catalog refresh", {
-      existing,
-      total: summary.total,
-    });
+    console.log("[sync] catalog already up to date, skipping catalog writes");
     return;
   }
 
-  console.log("[sync] refreshing LeetCode catalog and Zerotrac ratings", {
-    existing,
-    total: summary.total,
-  });
+  console.log("[sync] refreshing LeetCode catalog and Zerotrac ratings");
 
   const [catalog, zerotracRatings] = await Promise.all([
     fetchQuestionCatalog(),
     fetchZerotracRatings(),
   ]);
 
-  for (const batch of chunk(catalog, 100)) {
+  const existingProblems = await prisma.problem.findMany({
+    select: { slug: true },
+  });
+  const existingSlugs = new Set(existingProblems.map((problem) => problem.slug));
+  const missingProblems = catalog.filter((problem) => !existingSlugs.has(problem.slug));
+
+  console.log(`[sync] Missing catalog entries: ${missingProblems.length}`);
+
+  if (!missingProblems.length) {
+    console.log("[sync] catalog already up to date, skipping catalog writes");
+    return;
+  }
+
+  console.log(`[sync] Writing ${missingProblems.length} new problems...`);
+
+  for (const batch of chunk(missingProblems, 100)) {
     await prisma.$transaction(
       batch.map((problem) =>
         prisma.problem.upsert({
@@ -136,6 +148,8 @@ async function ensureProblemCatalog() {
       )
     );
   }
+
+  console.log("[sync] catalog update complete");
 }
 
 async function updateDerivedUserMetrics(userId: string) {
