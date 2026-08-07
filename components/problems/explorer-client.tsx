@@ -1,21 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { BookmarkButton } from "@/components/problems/bookmark-button";
+import { ExplorerFilters } from "@/components/problems/explorer-filters";
+import { buildExplorerGroups } from "@/components/problems/explorer-types";
+import { RatingExplorer } from "@/components/problems/rating-explorer";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { EXPLORER_RATING_BAND_OPTIONS } from "@/lib/constants";
 import { ProblemCardData } from "@/lib/types";
 
 type ExplorerResponse = {
@@ -28,6 +20,9 @@ export function ExplorerClient({ initialBand }: { initialBand?: string }) {
   const [difficulty, setDifficulty] = useState("All");
   const [solved, setSolved] = useState("All");
   const [search, setSearch] = useState("");
+  const [expandedBand, setExpandedBand] = useState<string | null>(
+    initialBand && initialBand !== "All" ? initialBand : null
+  );
 
   const query = useQuery({
     queryKey: ["problems", band, difficulty, solved, search],
@@ -47,127 +42,86 @@ export function ExplorerClient({ initialBand }: { initialBand?: string }) {
     },
   });
 
-  const groupedSummary = useMemo(() => {
+  const groups = useMemo(() => buildExplorerGroups(query.data?.items ?? []), [query.data?.items]);
+  const displayedGroups = useMemo(() => groups.filter((group) => group.total >= 5), [groups]);
+  const summary = useMemo(() => {
+    const total = query.data?.items.length ?? 0;
     const solvedCount = query.data?.items.filter((item) => item.solved).length ?? 0;
-    const remainingCount = (query.data?.items.length ?? 0) - solvedCount;
-    return { solvedCount, remainingCount };
+    return { total, solvedCount, remainingCount: total - solvedCount };
   }, [query.data?.items]);
+
+  useEffect(() => {
+    if (!search.trim() || !displayedGroups.length) {
+      return;
+    }
+
+    setExpandedBand((current) => (current === displayedGroups[0].band ? current : displayedGroups[0].band));
+  }, [displayedGroups, search]);
+
+  function handleBandChange(value: string) {
+    setBand(value);
+    if (value !== "All") {
+      setExpandedBand(value);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Clickable Rating Explorer</CardTitle>
+        <CardHeader className="gap-2">
+          <div className="text-xs uppercase tracking-[0.28em] text-muted-foreground">Problem library</div>
+          <CardTitle className="text-2xl">Rating Explorer</CardTitle>
           <CardDescription>
-            Browse solved and remaining problems by rating band, difficulty, and title.
+            Explore your solved, remaining, and saved problems by Zerotrac rating band.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-4">
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Rating band</div>
-            <Select value={band} onValueChange={setBand}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {EXPLORER_RATING_BAND_OPTIONS.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Difficulty</div>
-            <Select value={difficulty} onValueChange={setDifficulty}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["All", "Easy", "Medium", "Hard"].map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Solved status</div>
-            <Select value={solved} onValueChange={setSolved}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {["All", "Solved", "Remaining"].map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Search</div>
-            <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search by title" />
-          </div>
+        <CardContent>
+          <ExplorerFilters
+            band={band}
+            difficulty={difficulty}
+            solved={solved}
+            search={search}
+            onBandChange={handleBandChange}
+            onDifficultyChange={setDifficulty}
+            onSolvedChange={setSolved}
+            onSearchChange={setSearch}
+          />
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap gap-3">
-        <Badge variant="outline">Solved: {groupedSummary.solvedCount}</Badge>
-        <Badge variant="outline">Remaining: {groupedSummary.remainingCount}</Badge>
-        <Badge variant={query.data?.isExact ? "success" : "outline"}>
-          {query.data?.isExact ? "Exact solved set" : "Public-mode approximation"}
-        </Badge>
-      </div>
+      {query.isPending ? (
+        <div className="space-y-3" aria-label="Loading problem groups">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-28 animate-pulse rounded-2xl border bg-muted/30" />
+          ))}
+        </div>
+      ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        {query.data?.items.map((item) => (
-          <Card key={item.slug}>
-            <CardContent className="flex flex-col gap-4 p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-lg font-semibold">{item.title}</div>
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {item.difficulty} · {item.rating ? item.rating : "Unrated"}
-                  </div>
-                </div>
-                <Badge variant={item.solved ? "success" : "outline"}>
-                  {item.solved ? "Solved" : "Remaining"}
-                </Badge>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {item.topics.slice(0, 4).map((topic) => (
-                  <Badge key={topic} variant="secondary">
-                    {topic}
-                  </Badge>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <BookmarkButton
-                  problemSlug={item.slug}
-                  label="REVIEW_LATER"
-                  active={item.bookmarkedLabel === "REVIEW_LATER"}
-                />
-                <BookmarkButton
-                  problemSlug={item.slug}
-                  label="REVISIT"
-                  active={item.bookmarkedLabel === "REVISIT"}
-                />
-                <Link
-                  href={`https://leetcode.com/problems/${item.slug}/`}
-                  target="_blank"
-                  className="inline-flex items-center rounded-2xl border px-4 py-2 text-sm font-medium"
-                >
-                  Open on LeetCode
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {query.isError ? (
+        <div className="rounded-2xl border border-destructive/40 bg-destructive/5 px-6 py-8 text-sm text-muted-foreground">
+          Could not load problems. Please try again.
+        </div>
+      ) : null}
+
+      {query.data ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="outline">{summary.solvedCount} solved</Badge>
+            <Badge variant="outline">{summary.remainingCount} remaining</Badge>
+            <Badge variant="outline">{summary.total} filtered problems</Badge>
+            <Badge variant={query.data.isExact ? "success" : "outline"}>
+              {query.data.isExact ? "Exact solved set" : "Public-mode approximation"}
+            </Badge>
+          </div>
+
+          <RatingExplorer
+            groups={displayedGroups}
+            expandedBand={expandedBand}
+            search={search}
+            onExpandedBandChange={setExpandedBand}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
